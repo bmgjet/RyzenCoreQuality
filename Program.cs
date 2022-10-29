@@ -1,16 +1,23 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Management;
 
 namespace RyzenCoreQuality
 {
     internal class Program
     {
+        public class Details
+        {
+            public int key;
+            public int value;
+            public DateTime dt;
+        }
         static void Main(string[] args)
         {
             Console.Title = "Ryzen Core Quality";
             EventLog[] remoteEventLogs = EventLog.GetEventLogs();
-            Dictionary<int, int> Found = new Dictionary<int, int>();
+            List<Details> Found = new List<Details>();
             foreach (EventLog log in remoteEventLogs)
             {
                 if(log.Log == "System")
@@ -19,16 +26,29 @@ namespace RyzenCoreQuality
                     {
                         if(log2.InstanceId == 55)
                         {
-                            int core = int.Parse(log2.Message.Substring(log2.Message.IndexOf("processor ") + 10, 2));
-                            int rank = int.Parse(log2.Message.Substring(log2.Message.IndexOf("Maximum performance percentage: ") + 32, 3));
-                            if (!Found.ContainsKey(core)){Found.Add(core, rank);}
+                            Details d = new Details();
+                            d.key = int.Parse(log2.Message.Substring(log2.Message.IndexOf("processor ") + 10, 2)); ;
+                            d.value = int.Parse(log2.Message.Substring(log2.Message.IndexOf("Maximum performance percentage: ") + 32, 3)); ;
+                            d.dt = log2.TimeGenerated;
+                            Found.Add(d);
                         }
                     }
                     break;
                 }
             }
-            int count = 0; 
-            foreach(KeyValuePair<int,int> details in Found){if (details.Key % 2 == 0){Console.Write("Core: " + count++ + " Rank: " + details.Value + Environment.NewLine);}}
+            Found.Sort((x, y) => DateTime.Compare(y.dt, x.dt));
+            List<int> Reported = new List<int>();
+            int core = 0;
+            ManagementObjectSearcher myProcessorObject = new ManagementObjectSearcher("select * from Win32_Processor");
+            foreach (ManagementObject obj in myProcessorObject.Get()){Console.WriteLine(obj["Name"]);}
+            foreach (Details details in Found)
+            {
+                if(!Reported.Contains(details.key))
+                {
+                    Reported.Add(details.key);
+                    if (details.key % 2 == 0) { Console.Write("Core: " + core++ + " Rank: " + details.value + Environment.NewLine); }
+                }
+            }
             Console.ReadLine();
         }
     }
